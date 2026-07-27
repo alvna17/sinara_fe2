@@ -18,6 +18,16 @@ body {
   font-family: 'Poppins', Arial, Helvetica, sans-serif;
 }
 
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+select::-ms-expand {
+  display: none;
+}
+
 section {
   padding: 90px 40px;
 }
