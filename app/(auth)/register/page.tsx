@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { apiPost } from "@/services/api";
 import { TOKEN_KEY, ROLE_REDIRECT } from "@/app/constants/auth";
 import { Eye, EyeOff } from "lucide-react";
+import { extractApiError, normalizeNim } from "@/services/errorHandler";
 
 type Role = "calon" | "alumni";
 type Step = 1 | 2;
@@ -27,6 +28,7 @@ export default function RegisterPage() {
   const [angkatan, setAngkatan] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const steps = [
     { label: "Isi data diri dan identitas akun" },
@@ -49,10 +51,7 @@ export default function RegisterPage() {
 
   // ── Submit registrasi ke BE ─────────────────────────────────────────────
   // Dipakai baik dari step 2 (dengan data akademik) MAUPUN dari tombol Skip
-  // (tanpa data akademik). Sebelumnya handleSkip cuma router.push tanpa
-  // pernah manggil endpoint ini sama sekali → akun gak pernah kebuat, token
-  // gak pernah tersimpan, jadi begitu masuk ke /dashboard_*, layout guard
-  // langsung nendang balik ke /login (itu yang keliatan "jedag-jedug").
+  // (tanpa data akademik).
   const registerAccount = async (payload: {
     phone: string | null;
     kelas: string | null;
@@ -60,10 +59,11 @@ export default function RegisterPage() {
   }) => {
     setLoading(true);
     setError(null);
+    setFieldErrors({});
     try {
       const res = await apiPost("/register", {
         name,
-        nim,
+        nim: normalizeNim(nim),
         email,
         password,
         role,
@@ -71,6 +71,7 @@ export default function RegisterPage() {
         kelas: payload.kelas,
         angkatan: payload.angkatan,
       });
+
       if (res.access_token) {
         localStorage.setItem(TOKEN_KEY, res.access_token);
         localStorage.setItem("user", JSON.stringify(res.user));
@@ -78,8 +79,18 @@ export default function RegisterPage() {
       } else {
         setError(res.message ?? "Registrasi gagal. Silakan coba lagi.");
       }
-    } catch {
-      setError("Tidak dapat terhubung ke server.");
+    } catch (err: unknown) {
+      const { message, fieldErrors: fe } = extractApiError(err);
+      setError(message);
+      setFieldErrors(fe);
+
+      // Field yang error (name, nim, email, password) itu inputnya ada di
+      // Step 1 — kalau user lagi di Step 2 pas error ini muncul, balikin
+      // ke Step 1 dulu biar dia lihat field mana yang bermasalah.
+      const step1Fields = ["name", "nim", "email", "password"];
+      if (step1Fields.some((f) => fe[f])) {
+        setStep(1);
+      }
     } finally {
       setLoading(false);
     }
@@ -90,14 +101,17 @@ export default function RegisterPage() {
     await registerAccount({ phone, kelas, angkatan });
   };
 
-  // ✅ FIX: skip sekarang tetap mendaftarkan akun (field akademik dikosongin,
-  // karena memang nullable/opsional di backend), baru navigasi ke dashboard.
   const handleSkip = async () => {
     await registerAccount({ phone: null, kelas: null, angkatan: null });
   };
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const inputClass = (field: string) =>
+    `w-full px-4 py-2.5 border rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition ${
+      fieldErrors[field] ? "border-red-400" : "border-gray-200"
+    }`;
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-10">
@@ -170,13 +184,17 @@ export default function RegisterPage() {
                   Step {step} dari 2
                 </span>
               </div>
-              <Link
-                href="/"
-                className="text-xs font-medium text-gray-400 hover:text-indigo-600 transition"
-              >
+              <Link href="/" className="text-xs font-medium text-gray-400 hover:text-indigo-600 transition">
                 ← Kembali ke Beranda
               </Link>
             </div>
+
+            {/* Error Message — dipindah ke sini biar tampil di Step 1 maupun Step 2 */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">
+                {error}
+              </div>
+            )}
 
             {step === 1 ? (
               <>
@@ -184,10 +202,12 @@ export default function RegisterPage() {
                 <p className="text-gray-500 text-sm mb-6">
                   Lengkapi formulir di bawah ini untuk membuat akun baru di SINARA.
                 </p>
+
                 <div className="flex gap-2 mb-2 p-1 bg-gray-100 rounded-xl">
                   {([["calon", "Akan Magang"], ["alumni", "Sudah Magang"]] as [Role, string][]).map(([val, label]) => (
                     <button
                       key={val}
+                      type="button"
                       onClick={() => setRole(val)}
                       className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                         role === val
@@ -214,9 +234,11 @@ export default function RegisterPage() {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       required
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                      className={inputClass("name")}
                     />
+                    {fieldErrors.name && <p className="text-xs text-red-500">{fieldErrors.name}</p>}
                   </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-sm font-medium text-gray-700">NIM</label>
@@ -226,9 +248,18 @@ export default function RegisterPage() {
                         value={nim}
                         onChange={(e) => setNim(e.target.value)}
                         required
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                        className={inputClass("nim")}
                       />
+                      {/* Peringatan real-time kalau NIM masih mengandung titik */}
+                      {nim.includes(".") && (
+                        <p className="text-xs text-amber-600">
+                          Titik akan dihapus otomatis. Tersimpan sebagai:{" "}
+                          <span className="font-semibold">{normalizeNim(nim)}</span>
+                        </p>
+                      )}
+                      {fieldErrors.nim && <p className="text-xs text-red-500">{fieldErrors.nim}</p>}
                     </div>
+
                     <div className="flex flex-col gap-1.5">
                       <label className="text-sm font-medium text-gray-700">Email Universitas</label>
                       <input
@@ -237,13 +268,13 @@ export default function RegisterPage() {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                        className={inputClass("email")}
                       />
+                      {fieldErrors.email && <p className="text-xs text-red-500">{fieldErrors.email}</p>}
                     </div>
                   </div>
-                  {/* Tambahkan input konfirmasi password dengan toggle show/hide */}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Password */}
                     <div className="flex flex-col gap-1.5">
                       <label className="text-sm font-medium text-gray-700">Password</label>
                       <div className="relative">
@@ -254,7 +285,7 @@ export default function RegisterPage() {
                           onChange={(e) => setPassword(e.target.value)}
                           required
                           minLength={8}
-                          className="w-full px-4 py-2.5 pr-12 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                          className={`${inputClass("password")} pr-12`}
                         />
                         <button
                           type="button"
@@ -264,9 +295,13 @@ export default function RegisterPage() {
                           {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
                       </div>
-                      <p className="text-xs text-gray-400">Minimal 8 karakter</p>
+                      {fieldErrors.password ? (
+                        <p className="text-xs text-red-500">{fieldErrors.password}</p>
+                      ) : (
+                        <p className="text-xs text-gray-400">Minimal 8 karakter</p>
+                      )}
                     </div>
-                    {/* Konfirmasi Password */}
+
                     <div className="flex flex-col gap-1.5">
                       <label className="text-sm font-medium text-gray-700">Konfirmasi Password</label>
                       <div className="relative">
@@ -288,6 +323,7 @@ export default function RegisterPage() {
                       </div>
                     </div>
                   </div>
+
                   <button
                     type="submit"
                     className="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white font-semibold py-3 rounded-xl text-sm transition-all duration-200 mt-2"
@@ -295,6 +331,7 @@ export default function RegisterPage() {
                     Daftar Akun →
                   </button>
                 </form>
+
                 <div className="mt-6 pt-6 border-t border-gray-100 text-center">
                   <p className="text-sm text-gray-500">Sudah memiliki akun?</p>
                   <Link href="/login" className="text-sm font-medium text-indigo-600 hover:underline">
@@ -308,19 +345,13 @@ export default function RegisterPage() {
                 <p className="text-gray-500 text-sm mb-5">
                   Tambahkan informasi akademik untuk membantu kami memberikan detail yang lebih baik.
                 </p>
+
                 <div className="flex gap-3 bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 mb-6">
                   <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs flex-shrink-0 mt-0.5 font-bold">i</div>
                   <p className="text-xs text-indigo-700 leading-relaxed">
                     Data ini bersifat optional namun sangat disarankan untuk diisi agar kami dapat menyesuaikan data yang lebih personal.
                   </p>
                 </div>
-
-                {/* Error Message */}
-                {error && (
-                  <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">
-                    {error}
-                  </div>
-                )}
 
                 <form onSubmit={handleStep2} className="flex flex-col gap-4">
                   <div className="flex flex-col gap-1.5">
@@ -333,6 +364,7 @@ export default function RegisterPage() {
                       className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
                     />
                   </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-sm font-medium text-gray-700">Kelas</label>
@@ -358,6 +390,7 @@ export default function RegisterPage() {
                       </select>
                     </div>
                   </div>
+
                   <button
                     type="submit"
                     disabled={loading}
@@ -366,6 +399,7 @@ export default function RegisterPage() {
                     {loading ? "Menyimpan..." : "Lanjut →"}
                   </button>
                 </form>
+
                 <button
                   type="button"
                   onClick={handleSkip}
@@ -378,7 +412,6 @@ export default function RegisterPage() {
             )}
           </div>
         </div>
-
         <p className="md:hidden text-center text-gray-400 text-xs py-4 border-t border-gray-100">
           © 2026 SINARA · Politeknik Negeri Semarang
         </p>

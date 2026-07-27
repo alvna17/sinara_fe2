@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiPost } from "@/services/api";
 import { TOKEN_KEY, ROLE_REDIRECT } from "@/app/constants/auth";
+import { extractApiError, normalizeNim } from "@/services/errorHandler";
 
 type UserRole = "alumni" | "calon" | "admin";
 
@@ -54,16 +55,15 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
     try {
-      const res = await apiPost("/login", { nim, password, role: selectedRole });
+      const res = await apiPost("/login", {
+        nim: normalizeNim(nim),
+        password,
+        role: selectedRole,
+      });
 
       if (res.access_token) {
         const actualRole = res.user?.role ?? selectedRole;
-
-        // Role tidak cocok → tolak login, jangan simpan token.
-        // (Ini sudah benar sebelumnya: dicek SEBELUM localStorage/router.push,
-        // jadi tidak mungkin "kebablasan" masuk ke dashboard role lain.)
         if (actualRole !== selectedRole) {
           const roleLabel: Record<string, string> = {
             alumni: "Sudah Magang",
@@ -76,7 +76,6 @@ export default function LoginPage() {
           );
           return;
         }
-
         localStorage.setItem(TOKEN_KEY, res.access_token);
         localStorage.setItem("user", JSON.stringify(res.user));
         router.push(ROLE_REDIRECT[actualRole]);
@@ -84,24 +83,12 @@ export default function LoginPage() {
         setError(res.message || "Login gagal. Periksa NIM dan password.");
       }
     } catch (err: unknown) {
-      // ✅ FIX: sebelumnya `catch { setError("Tidak dapat terhubung ke server.") }`
-      // gak peduli apa isi err-nya, jadi NIM/password salah (401 dari BE, sudah
-      // berisi pesan "NIM atau password salah") ikut ketutup jadi pesan generik.
-      // apiPost() (lewat handleResponse di services/api.js) throw:
-      //   - objek JSON asli dari Laravel kalau response error tapi valid JSON
-      //     → { message: "NIM atau password salah" } untuk 401
-      //   - Error biasa kalau response bukan JSON sama sekali
-      //   - TypeError bawaan browser kalau fetch benar-benar gagal (server mati/CORS)
-      // Baru untuk kasus terakhir itu pesan "Tidak dapat terhubung ke server" relevan.
-      if (err instanceof TypeError) {
-        setError("Tidak dapat terhubung ke server.");
-      } else if (err && typeof err === "object" && "message" in err) {
-        setError(String((err as { message?: string }).message) || "Login gagal. Periksa NIM dan password.");
-      } else if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Tidak dapat terhubung ke server.");
-      }
+      // Semua kemungkinan error (401 NIM/password salah, 422 validasi,
+      // 500 server error, network gagal total) ditangani satu tempat
+      // lewat extractApiError, biar pesannya selalu sesuai apa yang
+      // sebenernya dikirim backend.
+      const { message } = extractApiError(err);
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -110,7 +97,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-5xl flex flex-col md:flex-row gap-5">
-
         {/* ===== LEFT PANEL ===== */}
         <div className="bg-indigo-600 text-white px-8 py-10 rounded-2xl md:w-[38%] flex flex-col justify-between gap-10">
           <div>
@@ -122,14 +108,9 @@ export default function LoginPage() {
               Pilih status mahasiswa sesuai kebutuhanmu sebelum masuk ke sistem.
             </p>
           </div>
-
-          {/* Tips */}
           <div className="flex flex-col gap-3">
             {tips.map((tip, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-3 bg-white/10 border border-white/20 rounded-xl px-4 py-3"
-              >
+              <div key={i} className="flex items-center gap-3 bg-white/10 border border-white/20 rounded-xl px-4 py-3">
                 <span className="text-indigo-200 flex-shrink-0">{tip.icon}</span>
                 <p className="text-white text-sm">{tip.text}</p>
               </div>
@@ -141,10 +122,7 @@ export default function LoginPage() {
         <div className="flex-1 bg-white rounded-2xl px-8 py-10 flex flex-col justify-center">
           <div className="flex items-center justify-between mb-1">
             <h2 className="text-2xl font-bold text-gray-900">Masuk</h2>
-            <Link
-              href="/"
-              className="text-xs font-medium text-gray-400 hover:text-indigo-600 transition"
-            >
+            <Link href="/" className="text-xs font-medium text-gray-400 hover:text-indigo-600 transition">
               ← Kembali ke Beranda
             </Link>
           </div>
@@ -152,12 +130,12 @@ export default function LoginPage() {
             Pilih jenis akun lalu isi data untuk melanjutkan.
           </p>
 
-          {/* Role Card Grid */}
           <p className="text-sm font-semibold text-gray-800 mb-3">Masuk sebagai</p>
           <div className="grid grid-cols-3 gap-3 mb-6">
             {roles.map((role) => (
               <button
                 key={role.value}
+                type="button"
                 onClick={() => setSelectedRole(role.value)}
                 className={`text-left px-4 py-3 rounded-xl border-2 transition-all duration-200 ${
                   selectedRole === role.value
@@ -166,11 +144,9 @@ export default function LoginPage() {
                 }`}
               >
                 <p className="font-semibold text-sm">{role.label}</p>
-                <p
-                  className={`text-xs mt-1 leading-relaxed ${
-                    selectedRole === role.value ? "text-indigo-200" : "text-gray-400"
-                  }`}
-                >
+                <p className={`text-xs mt-1 leading-relaxed ${
+                  selectedRole === role.value ? "text-indigo-200" : "text-gray-400"
+                }`}>
                   {role.desc}
                 </p>
               </button>
@@ -196,16 +172,20 @@ export default function LoginPage() {
                   className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
                 />
               </div>
+              {/* Peringatan real-time kalau NIM masih mengandung titik */}
+              {nim.includes(".") && (
+                <p className="text-xs text-amber-600">
+                  Titik akan dihapus otomatis saat login. NIM terbaca:{" "}
+                  <span className="font-semibold">{normalizeNim(nim)}</span>
+                </p>
+              )}
             </div>
 
             {/* Password */}
             <div className="flex flex-col gap-1.5">
               <div className="flex justify-between items-center">
                 <label className="text-sm font-semibold text-gray-800">Password</label>
-                <Link
-                  href="/lupa_password"
-                  className="text-sm text-indigo-600 hover:underline font-medium"
-                >
+                <Link href="/lupa_password" className="text-sm text-indigo-600 hover:underline font-medium">
                   Lupa password?
                 </Link>
               </div>
@@ -242,14 +222,12 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Error Message */}
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">
                 {error}
               </div>
             )}
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
@@ -262,7 +240,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Register Box */}
           <div className="mt-5 bg-indigo-50 rounded-xl px-5 py-4">
             <p className="text-sm font-semibold text-gray-800 mb-0.5">Belum punya akun?</p>
             <p className="text-xs text-gray-400 mb-3">
