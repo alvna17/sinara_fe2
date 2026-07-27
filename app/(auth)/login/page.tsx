@@ -203,7 +203,7 @@ export default function LoginPage() {
               <div className="flex justify-between items-center">
                 <label className="text-sm font-semibold text-gray-800">Password</label>
                 <Link
-                  href="/lupa-password"
+                  href="/lupa_password"
                   className="text-sm text-indigo-600 hover:underline font-medium"
                 >
                   Lupa password?
