@@ -6,8 +6,7 @@
 import { useState, useRef, useEffect } from "react";
 import { X, Search } from "lucide-react";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
+const API_BASE = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api`;
 
 // ── Types ────────────────────────────────────────────────────────────
 export interface Step1Data {
