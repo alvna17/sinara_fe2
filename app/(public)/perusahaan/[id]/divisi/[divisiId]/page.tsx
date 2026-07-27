@@ -31,7 +31,7 @@ interface DivisionDetail {
 const API_BASE = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api`;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function StarRating({ rating, size = "sm" }: { rating: number; size?: "sm" | "md" }) {
+function StarRating({ rating, size = "sm", showLabel = true }: { rating: number; size?: "sm" | "md"; showLabel?: boolean }) {
   const cls = size === "md" ? "w-5 h-5" : "w-4 h-4";
   // Persentase pengisian total (0-100), dipakai buat clip overlay bintang kuning
   // di atas bintang abu-abu -- ini yang bikin bintang ke-5 misalnya cuma
@@ -62,9 +62,11 @@ function StarRating({ rating, size = "sm" }: { rating: number; size?: "sm" | "md
           ))}
         </div>
       </div>
-      <span className={`ml-1 font-semibold ${size === "md" ? "text-base" : "text-sm"} text-gray-700`}>
-        {rating.toFixed(1)}/5
-      </span>
+      {showLabel && (
+        <span className={`ml-1 font-semibold ${size === "md" ? "text-base" : "text-sm"} text-gray-700`}>
+          {rating.toFixed(1)}/5
+        </span>
+      )}
     </div>
   );
 }
@@ -196,7 +198,7 @@ export default function DetailDivisiPage() {
             <div>
               <p className="text-xs text-gray-400 mb-1">Rating divisi</p>
               <div className="flex items-center gap-2 mt-1">
-                <StarRating rating={division.avg_rating} />
+                <StarRating rating={division.avg_rating} showLabel={false} />
                 <span className="text-2xl font-bold text-gray-900">{division.avg_rating.toFixed(1)}/5</span>
               </div>
               <p className="text-xs text-gray-400 mt-0.5">Penilaian rata-rata berdasarkan pengalaman magang</p>
