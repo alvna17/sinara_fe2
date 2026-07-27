@@ -3,7 +3,7 @@
 // Hook untuk fetch skill milik user & semua skill master (untuk autocomplete)
 import { useState, useEffect, useCallback } from "react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
+const API_BASE = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api`;
 
 function authHeaders() {
   const token =
