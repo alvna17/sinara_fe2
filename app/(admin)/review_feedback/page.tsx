@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNotification } from "@/components/ui/notification";
 import { Eye, X, Check, ChevronDown } from "lucide-react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
+const API_BASE = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api`;
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type StatusFilter = "pending" | "approved" | "rejected";

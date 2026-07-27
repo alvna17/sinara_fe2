@@ -18,7 +18,7 @@ import {
 // buat semua halaman di grup admin. Kalau di-render lagi di sini, sidebar & header
 // jadi dobel dan padding/margin numpuk (pt-16 + pt-16, md:ml-60 + md:ml-60).
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
+const API_BASE = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api`;
 const PER_PAGE = 30;
 
 interface Student {

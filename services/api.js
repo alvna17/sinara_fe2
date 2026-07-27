@@ -1,4 +1,4 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
+const API_BASE = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api`;
 
 async function handleResponse(res) {
   // Kalau response bukan JSON (misal HTML error page), tangkap dengan baik
@@ -20,7 +20,7 @@ export async function apiPost(endpoint, data, token) {
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
+  const res = await fetch(`${API_BASE}${endpoint}`, {
     method: 'POST',
     headers,
     body: JSON.stringify(data),
@@ -35,7 +35,7 @@ export async function apiGet(endpoint, token) {
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
+  const res = await fetch(`${API_BASE}${endpoint}`, {
     method: 'GET',
     headers,
   });
@@ -50,7 +50,7 @@ export async function apiDelete(endpoint, token) {
 
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
+  const res = await fetch(`${API_BASE}${endpoint}`, {
     method: 'DELETE',
     headers,
   });

@@ -6,7 +6,7 @@ import { CompanyGridCard, Company } from "@/components/recommendation/CompanyGri
 import { useProfile } from "@/hooks/useProfile";
 import { FilterDivisi, FilterLokasi, FilterDurasi, FilterRating } from "@/components/filter";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
+const API_BASE = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api`;
 
 export default function CalonDashboard() {
   const router = useRouter();

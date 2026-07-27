@@ -23,8 +23,7 @@ const INITIAL_STEP2: Step2Data = {
   durasi: "",
 };
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
+const API_BASE = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api`;
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 export default function CariRekomendasiPage() {
