@@ -139,7 +139,7 @@ export default function CalonDashboard() {
             onClick={() => router.push("/cari_rekomendasi")}
             className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg py-2 px-4 mt-auto transition text-sm sm:text-base"
           >
-            Mulai rekomendasi AI
+            Mulai cari rekomendasi
           </button>
         </div>
       </div>
